@@ -1,2 +1,8 @@
 # Virtual env
 .venv/**/*
+
+# PyCharm
+.idea/**/*
+
+# Database
+database.db

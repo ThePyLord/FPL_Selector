@@ -6,3 +6,12 @@
 
 # Database
 database.db
+
+# Compiled files
+*.pyc
+
+# MacOS files
+.DS_Store
+
+# Models
+models/

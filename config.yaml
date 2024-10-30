@@ -1,0 +1,10 @@
+username: your_username
+password: your_password
+fpl_id: 58754799
+my_id: 5594381
+
+# Database
+db:
+  host: localhost
+  port: 5432
+  database: fpl_db

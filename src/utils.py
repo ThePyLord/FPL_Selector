@@ -1,20 +1,42 @@
 # Standard imports
+from time import time
 import urllib.request as request
+import tempfile
 import logging
 # Data manipulation
 import json, yaml
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 
-logging.basicConfig(
-	level=logging.INFO, 
-	format='%(levelname)s %(asctime)s - %(message)s',
-	datefmt='%d-%b %H:%M')
+def setup_logging():
+    logging.basicConfig(
+		level=logging.INFO, 
+		format='%(levelname)s %(asctime)s - %(message)s',
+		datefmt='%d-%b %H:%M')
+
+
+class Timer:
+    def __init__(self):
+        self.start = time()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.end = time()
+        self.interval = self.end - self.start
+        print(f"Time taken: {self.interval:.2f} seconds")
+
 
 class Database:
 	def __init__(self, path="../config.yaml"):
 		self.path = path
-		self.engine = self.make_connection()
+		try:
+			self.engine = self.make_connection()
+		except Exception as e:
+			logging.error(f"Error connecting to the database: {e}")
 
 	def make_connection(self):
 		"""Creates a connection to the database
@@ -36,15 +58,49 @@ class Database:
 			column_lst: list[str], the column names of the table.
 			values: str, the values to be inserted into the table """
 		columns = ', '.join(column_lst)
-
 		# placeholders = ', '.join(['%s'] * len(column_lst))
 		placeholders = ", ".join([f":{col}" for col in column_lst])
 		query = (f'INSERT INTO {table} ({columns}) VALUES ({placeholders})'
 		)
+		print(f'params: {values}')
 		params = {col: val for col, val in zip(column_lst, values)}
 		with self.engine.connect() as conn:
-			conn.execute(text(query), params)
-			conn.commit()
+			try:
+				conn.execute(text(query), params)
+				conn.commit()
+			except Exception as e:
+				logging.error(f"Error writing to the database: {e}")
+				conn.rollback()
+
+
+	def bulk_insert(self, table: str, df: pd.DataFrame):
+		"""Bulk insert data into the database
+		Args:
+			table: str, the name of the table to insert into.
+			df: pd.DataFrame, the data to be inserted into the table
+		"""
+		min_year = pd.to_datetime(df["kickoff_time"]).min().year
+		df_cpy = df.copy()
+		df_cpy['season'] = f"{min_year}-{str(min_year + 1)[2:]}"
+		records = df_cpy.to_dict(orient="records")
+		with self.engine.connect() as conn:
+			for row in records:
+				inserts = insert(table).values(row)
+
+				do_nothing_stmt = inserts.on_conflict_do_nothing(index_elements=['name', 'kickoff_time', 'gw', 'season'])
+
+				try:
+					# conn.execute(insert(table).values(records
+					conn.execute(do_nothing_stmt)
+					conn.commit()
+				except IntegrityError as ie:
+					logging.error(f"Error writing to the database: {ie}")
+					conn.rollback()
+				except Exception as e:
+					logging.error(f"Error writing to the database: {e}")
+					conn.rollback()
+			conn.execute("""REINDEX TABLE gameweek_stats""")
+				
 
 	def get_data(self, query, params=None):
 		"""Fetches data from the database
@@ -55,8 +111,9 @@ class Database:
 						df, dataframe of the fetched data
 		"""
 		with self.engine.connect() as conn:
-			print(f"Query: {query}")
 			df = pd.read_sql(text(query), conn, params=params)
+		if df.columns.str.contains("kickoff_time").any():
+			df["kickoff_time"] = pd.to_datetime(df["kickoff_time"], utc=True)
 		return df
 
 
@@ -135,25 +192,56 @@ def fetch_gw_data(season: str, gw: int):
 
 
 def dataframe_to_db(df, table_name, db: Database):
-	# df.to_sql(table_name, engine, if_exists='replace', index=False)
-	min_year = pd.to_datetime(df['kickoff_time']).min().year
+	min_year = pd.to_datetime(df["kickoff_time"]).min().year
 	columns = df.columns.tolist()
-	existing_row_count = db.get_data(f"SELECT COUNT(*) FROM {table_name} WHERE season = '{min_year}-{str(min_year + 1)[2:]}'")
+	columns.append("season")
+	columns = list(map(str.lower, columns))
+	existing_row_count = db.get_data(
+		f"SELECT COUNT(*) FROM {table_name} WHERE season = '{min_year}-{str(min_year + 1)[2:]}'"
+	)
 	row_count = 0
+	season = f"{min_year}-{str(min_year + 1)[2:]}"
 	for _, row in df.iterrows():
 		# print(row.values)
-		# print('Retrieving row data')
-		row_from_db = db.get_data(
-			f"""
-			SELECT * FROM {table_name}
-			WHERE name = %s AND kickoff_time = %s AND GW = %s
-			""", (row['name'], row['kickoff_time'], row['GW']))
-		
-		season = f'{min_year}-{str(min_year + 1)[2:]}'
+		# print("Retrieving row data")
+		with db.engine.connect() as conn:
+			row_from_db = conn.execute(
+				text(
+					f"""
+					SELECT * FROM {table_name}
+					WHERE name = :name 
+					AND kickoff_time = :kickoff_time
+					AND gw = :GW 
+					AND season = :season
+					"""
+				),
+				{
+					"name": row["name"], 
+					'kickoff_time': row["kickoff_time"],
+					"GW": row["GW"], 
+					"season": season
+				},
+			)
+			row_from_db = row_from_db.fetchone()
+
 		if row_from_db is not None:
 			row_count += 1
-			# print(f'Year: {season}')
-			# print(f"Row already exists: {row['name']}, {row['kickoff_time']}, {row['GW']}")
 			continue
-		db.write_to_sql(f'{table_name}', columns, row.values.tolist().append(season))
-	print(f"{row_count} rows already exist in the database.")
+
+		print('Inserting row')
+		values = row.values.tolist()
+		values.append(season)
+
+		db.write_to_sql(table_name, columns, values)
+	res = db.get_data(
+		f"SELECT COUNT(*) FROM {table_name} WHERE season = '{min_year}-{str(min_year + 1)[2:]}'"
+	)
+	print(f"{res.values[0][0]} rows inserted into the database.")
+
+
+def insert_gameweek_stats(df, table_name, db: Database):
+	# Add season column if needed
+	min_year = pd.to_datetime(df["kickoff_time"]).min().year
+	df["season"] = f"{min_year}-{str(min_year + 1)[2:]}"
+	rows = df.to_dict(orient="records")
+	print(rows[0])

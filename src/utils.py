@@ -58,11 +58,11 @@ class Database:
 			column_lst: list[str], the column names of the table.
 			values: str, the values to be inserted into the table """
 		columns = ', '.join(column_lst)
-		# placeholders = ', '.join(['%s'] * len(column_lst))
+		
 		placeholders = ", ".join([f":{col}" for col in column_lst])
 		query = (f'INSERT INTO {table} ({columns}) VALUES ({placeholders})'
 		)
-		print(f'params: {values}')
+		
 		params = {col: val for col, val in zip(column_lst, values)}
 		with self.engine.connect() as conn:
 			try:
@@ -196,9 +196,7 @@ def dataframe_to_db(df, table_name, db: Database):
 	columns = df.columns.tolist()
 	columns.append("season")
 	columns = list(map(str.lower, columns))
-	existing_row_count = db.get_data(
-		f"SELECT COUNT(*) FROM {table_name} WHERE season = '{min_year}-{str(min_year + 1)[2:]}'"
-	)
+	
 	row_count = 0
 	season = f"{min_year}-{str(min_year + 1)[2:]}"
 	for _, row in df.iterrows():
@@ -228,7 +226,6 @@ def dataframe_to_db(df, table_name, db: Database):
 			row_count += 1
 			continue
 
-		print('Inserting row')
 		values = row.values.tolist()
 		values.append(season)
 
@@ -237,11 +234,3 @@ def dataframe_to_db(df, table_name, db: Database):
 		f"SELECT COUNT(*) FROM {table_name} WHERE season = '{min_year}-{str(min_year + 1)[2:]}'"
 	)
 	print(f"{res.values[0][0]} rows inserted into the database.")
-
-
-def insert_gameweek_stats(df, table_name, db: Database):
-	# Add season column if needed
-	min_year = pd.to_datetime(df["kickoff_time"]).min().year
-	df["season"] = f"{min_year}-{str(min_year + 1)[2:]}"
-	rows = df.to_dict(orient="records")
-	print(rows[0])

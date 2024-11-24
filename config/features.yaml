@@ -1,0 +1,30 @@
+position_features:
+  gk: [
+    'minutes', 'clean_sheets', 'saves', 'penalties_saved',
+    'expected_goals_conceded', 'goals_conceded', 'influence',
+    'ict_index', 'value', 'selected', 'transfers_balance', 'form',
+    'team_form', 'consecutive_starts', 'assists', 'goals_scored'
+  ]
+  def: [
+    'minutes', 'goals_scored', 'assists', 'clean_sheets', 'goals_conceded',
+    'saves', 'penalties_saved', 'penalties_missed', 'yellow_cards',
+    'red_cards', 'bonus', 'bps', 'influence', 'creativity', 'threat',
+    'ict_index', 'value', 'selected', 'transfers_balance', 'form',
+    'team_form', 'consecutive_starts'
+  ]
+  mid: [
+    'minutes', 'goals_scored', 'assists', 'clean_sheets',
+    'expected_goals', 'expected_assists', 'threat', 'creativity',
+    'influence', 'ict_index', 'value', 'selected', 'transfers_balance',
+    'form', 'team_form', 'team_scoring_form',
+    'points_trend', 'consecutive_starts'
+  ]
+  fwd: [
+    'minutes', 'goals_scored', 'assists', 'clean_sheets', 'goals_conceded',
+    'expected_assists', 'threat', 'creativity', 'influence',
+    'ict_index', 'value', 'selected', 'transfers_balance', 'form',
+    'team_form', 'team_scoring_form',
+    'points_trend', 'consecutive_starts'
+  ]
+
+target: 'total_points'

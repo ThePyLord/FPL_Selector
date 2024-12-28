@@ -11,4 +11,6 @@ Goals:
 ## Data
 
 Source: 
+- Fantasy Premier League (FPL) Data: https://github.com/vaastav/Fantasy-Premier-League
+- FPL API: https://fantasy.premierleague.com/api/bootstrap-static/
 

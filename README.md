@@ -14,3 +14,9 @@ Source:
 - Fantasy Premier League (FPL) Data: https://github.com/vaastav/Fantasy-Premier-League
 - FPL API: https://fantasy.premierleague.com/api/bootstrap-static/
 
+## TODO
+- [ ] Get data from FPL API
+- [ ] Create a model to select a team that maximises points
+- [ ] Add lagging features to feature engineering
+- [ ] Add constraints to team selection
+- [ ] Improve dataset creation to split into validation set.

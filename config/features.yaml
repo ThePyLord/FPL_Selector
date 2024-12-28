@@ -17,7 +17,10 @@ position_features:
     'expected_goals', 'expected_assists', 'threat', 'creativity',
     'influence', 'ict_index', 'value', 'selected', 'transfers_balance',
     'form', 'team_form', 'team_scoring_form',
-    'points_trend', 'consecutive_starts'
+    'points_trend', 'consecutive_starts', 'total_points_rolling_5', 'minutes_rolling_5', 'goals_scored_rolling_5',
+    'assists_rolling_5', 'clean_sheets_rolling_5',
+    'expected_goals_rolling_5', 'expected_assists_rolling_5', 'team_form',
+    'team_scoring_form',
   ]
   fwd: [
     'minutes', 'goals_scored', 'assists', 'clean_sheets', 'goals_conceded',

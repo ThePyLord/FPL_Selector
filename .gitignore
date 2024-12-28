@@ -4,6 +4,9 @@
 # PyCharm
 .idea/**/*
 
+# Config
+config/league.yaml
+
 # Database
 database.db
 

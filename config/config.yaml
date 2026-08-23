@@ -1,0 +1,118 @@
+data:
+  fpl_api_base_url: "https://fantasy.premierleague.com/api/"
+  vaastav_base_url: "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/refs/heads/master/data"
+  refresh_interval_minutes: 60
+  data_retention_weeks: 156  # 3 seasons
+
+preprocessing:
+  position:
+    goalkeeper:
+      features:
+        - minutes
+        - saves
+        - clean_sheets
+        - goals_conceded
+        - penalties_saved
+        - penalties_missed
+        - own_goals
+        - yellow_cards
+        - red_cards
+        - bonus
+        - bps
+        - influence
+        - creativity
+        - threat
+        - ict_index
+        - form
+        - total_points
+    defender:
+      features:
+      - minutes
+      - clean_sheets
+      - goals_scored
+      - assists
+      -	expected_goals
+      - expected_assists
+      - threat
+      - creativity
+      -	influence
+      - ict_index
+      - value
+      - selected
+      - transfers_balance
+      -	form
+      - team_form
+      - team_scoring_form
+      -	points_trend
+      - consecutive_starts
+      - expected_goals_conceded
+    midfielder:
+      features:
+      - minutes
+      - goals_scored
+      - assists
+      - clean_sheets
+      - expected_goals
+      - expected_assists
+      - threat
+      - creativity
+      - influence
+      - ict_index
+      - value
+      - selected
+      - transfers_balance
+      - form
+      - team_form
+      - team_scoring_form
+      - points_trend
+      - consecutive_starts
+    forward:
+      - minutes
+      - goals_scored
+      - assists
+      - expected_goals
+      - expected_assists
+      - threat
+      - creativity
+      - influence
+      - ict_index
+      - value
+      - selected
+      - transfers_balance
+      - form
+      - team_form
+      - team_scoring_form
+      - points_trend
+      - consecutive_starts
+      - total_points
+  target: total_points_next_gameweek
+  rolling_window_size: [3, 5, 10]
+  missing_value_strategy: mean_imputation
+
+models:
+  ensemble_weights:
+    random_forest: 0.3
+    xgboost: 0.3
+    lstm: 0.4
+  
+  training:
+    test_size: 0.2
+    validation_gameweeks: 5
+    min_training_gameweeks: 10
+    max_changes: 3
+optimization:
+  risk_profiles:
+    conservative:
+      variance_penalty: 0.5
+      uncertainty_threshold: 0.3
+    balanced:
+      variance_penalty: 0.2  
+      uncertainty_threshold: 0.5
+    aggressive:
+      variance_penalty: 0.0
+      uncertainty_threshold: 0.8
+
+logging:
+  level: INFO
+  format: json
+  file: logs/fpl_ml.log

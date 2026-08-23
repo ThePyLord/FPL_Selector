@@ -43,7 +43,3 @@ Here’s a data dictionary for the columns found in the vastaav FPL gameweek dat
 | **was_home**         | Indicator of whether the player's team was playing at home (1 if yes).      |
 | **yellow_cards**     | Number of yellow cards received by the player.                              |
 | **GW**               | Gameweek number (similar to 'round').                                       |
-
-Source: ChatGPT
-
-[]: # (end)

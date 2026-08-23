@@ -23,7 +23,7 @@ position_features:
     'team_scoring_form',
   ]
   fwd: [
-    'minutes', 'goals_scored', 'assists', 'clean_sheets', 'goals_conceded',
+    'minutes', 'goals_scored', 'assists', 'goals_conceded',
     'expected_assists', 'threat', 'creativity', 'influence',
     'ict_index', 'value', 'selected', 'transfers_balance', 'form',
     'team_form', 'team_scoring_form',

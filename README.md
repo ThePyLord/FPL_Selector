@@ -86,7 +86,7 @@ mypy src/fpl_selector/
 
 ## Roadmap
 
-
+See [docs/PRD.md](docs/PRD.md) for the full product roadmap.
 
 ### MVP (Target: Matchday 30)
 - [x] Data pipeline (collectors, storage, validators)

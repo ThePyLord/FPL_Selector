@@ -1,33 +1,33 @@
 # Standard imports
 from time import time
 import urllib.request as request
-import tempfile
 import logging
 # Data manipulation
 import json, yaml
 import pandas as pd
-from sqlalchemy import create_engine, text
+import polars as pl
+from sqlalchemy import create_engine, text, Table, MetaData
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 def setup_logging():
-    logging.basicConfig(
+	logging.basicConfig(
 		level=logging.INFO, 
 		format='%(levelname)s %(asctime)s - %(message)s',
 		datefmt='%d-%b %H:%M')
 
 
 class Timer:
-    def __init__(self):
-        self.start = time()
+	def __init__(self):
+		self.start = time()
 
-    def __enter__(self):
-        return self
+	def __enter__(self):
+		return self
 
-    def __exit__(self, *args):
-        self.end = time()
-        self.interval = self.end - self.start
-        print(f"Time taken: {self.interval:.2f} seconds")
+	def __exit__(self, *args):
+		self.end = time()
+		self.interval = self.end - self.start
+		logging.info(f"Time taken: {self.interval:.2f} seconds")
 
 
 class Database:
@@ -60,8 +60,7 @@ class Database:
 		columns = ', '.join(column_lst)
 		
 		placeholders = ", ".join([f":{col}" for col in column_lst])
-		query = (f'INSERT INTO {table} ({columns}) VALUES ({placeholders})'
-		)
+		query = f'INSERT INTO {table} ({columns}) VALUES ({placeholders})'
 		
 		params = {col: val for col, val in zip(column_lst, values)}
 		with self.engine.connect() as conn:
@@ -102,7 +101,7 @@ class Database:
 			conn.execute("""REINDEX TABLE gameweek_stats""")
 				
 
-	def get_data(self, query, params=None):
+	def get_data(self, query, params=None, df_type = 'pandas'):
 		"""Fetches data from the database
 		Args:
 						query: str, SQL query
@@ -111,10 +110,26 @@ class Database:
 						df, dataframe of the fetched data
 		"""
 		with self.engine.connect() as conn:
-			df = pd.read_sql(text(query), conn, params=params)
-		if df.columns.str.contains("kickoff_time").any():
-			df["kickoff_time"] = pd.to_datetime(df["kickoff_time"], utc=True)
-		return df
+			try:
+				if df_type.lower() == 'polars':
+					df = pl.read_database(
+						text(query),
+						conn,
+						execute_options={'parameters': params},
+						schema_overrides={'kickoff_time': pl.Datetime}
+					)
+					if 'kickoff_time' in df.columns:
+						df['kickoff_time'].dt.replace_time_zone(time_zone='UTC')
+					return df
+				else:
+					df = pd.read_sql(text(query), conn, params=params)
+					if df.columns.str.contains("kickoff_time").any():
+						df["kickoff_time"] = pd.to_datetime(df["kickoff_time"], utc=True)
+					return df
+
+			except:
+				logging.error("Error retrieving data from table!!!!!!")
+
 
 
 async def fetch_data(url):
@@ -189,48 +204,42 @@ def fetch_gw_data(season: str, gw: int):
 	except ValueError as e:
 		print(e)
 		return None
-
-
-def dataframe_to_db(df, table_name, db: Database):
-	min_year = pd.to_datetime(df["kickoff_time"]).min().year
-	columns = df.columns.tolist()
-	columns.append("season")
-	columns = list(map(str.lower, columns))
 	
-	row_count = 0
-	season = f"{min_year}-{str(min_year + 1)[2:]}"
-	for _, row in df.iterrows():
-		# print(row.values)
-		# print("Retrieving row data")
-		with db.engine.connect() as conn:
-			row_from_db = conn.execute(
-				text(
-					f"""
-					SELECT * FROM {table_name}
-					WHERE name = :name 
-					AND kickoff_time = :kickoff_time
-					AND gw = :GW 
-					AND season = :season
-					"""
-				),
-				{
-					"name": row["name"], 
-					'kickoff_time': row["kickoff_time"],
-					"GW": row["GW"], 
-					"season": season
-				},
-			)
-			row_from_db = row_from_db.fetchone()
 
-		if row_from_db is not None:
-			row_count += 1
-			continue
+def dataframe_to_db(df, table_name, db: Database, conflict_columns=None):
+	"""
+	Inserts data from a DataFrame into a database table.
 
-		values = row.values.tolist()
-		values.append(season)
+	Args:
+			df (pd.DataFrame): The DataFrame containing the data to be inserted.
+			table_name (str): The name of the table to insert data into.
+			db (Database): The Database object to use for the connection.
+			conflict_columns (list[str], optional): List of columns to check for conflicts. Defaults to None.
+	"""
+	columns = df.columns.tolist()
+	columns = list(map(str.lower, columns))
+	records = df.to_dict(orient="records")
+	table = Table(table_name, MetaData(), autoload_with=db.engine)
+	
+	with db.engine.connect() as conn:
+	
+		for row in records:
+			inserts = insert(table).values(row)
+			if conflict_columns:
+				do_nothing_stmt = inserts.on_conflict_do_nothing(
+					index_elements=conflict_columns
+				)
+			else:
+				do_nothing_stmt = inserts.on_conflict_do_nothing()
 
-		db.write_to_sql(table_name, columns, values)
-	res = db.get_data(
-		f"SELECT COUNT(*) FROM {table_name} WHERE season = '{min_year}-{str(min_year + 1)[2:]}'"
-	)
-	print(f"{res.values[0][0]} rows inserted into the database.")
+			try:
+				conn.execute(do_nothing_stmt)
+				conn.commit()
+			except IntegrityError as ie:
+				logging.error(f"Error writing to the database: {ie}")
+				conn.rollback()
+			except Exception as e:
+				logging.error(f"Error writing to the database: {e}")
+				conn.rollback()
+
+	logging.info(f"{len(records)} rows processed for insertion into the database.")

@@ -2,7 +2,7 @@
 .venv/**/*
 
 # PyCharm
-.idea/**/*
+.idea/
 
 # Config
 config/league.yaml
@@ -16,5 +16,30 @@ database.db
 # MacOS files
 .DS_Store
 
+# Data artifacts
+/data/raw/
+/data/processed/
+
 # Models
-models/
+/models/
+/data/models/
+
+# PDF files
+*.pdf
+
+# Python
+__pycache__/
+*.pyo
+*.pyd
+.venv/
+.pytest_cache/
+
+# Stray artifacts
+/src/model.pth
+/src/models.joblib
+TECH_SPEC.log
+ols_arima.png
+.claude/
+
+# Scratch
+fpl_tech_spec.*

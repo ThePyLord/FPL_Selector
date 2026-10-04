@@ -4,6 +4,9 @@
 # PyCharm
 .idea/
 
+# VS Code
+.vscode/
+
 # Config
 config/league.yaml
 
